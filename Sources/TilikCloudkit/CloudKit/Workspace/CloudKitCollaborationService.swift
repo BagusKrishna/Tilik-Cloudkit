@@ -57,11 +57,11 @@ public final class CloudKitCollaborationService: CollaborationCloudServing {
         let workspace = TPAWorkspace(
             context: context, name: name, ownerAccountID: accountID, schemaVersion: 1)
         _ = try await container.privateCloudDatabase.save(zone)
-        let record = CKRecord(recordType: "TilikWorkspace", recordID: rootID(context))
-        record["workspaceID"] = identifier as CKRecordValue
-        record["name"] = name as CKRecordValue
-        record["ownerAccountID"] = accountID as CKRecordValue
-        record["schemaVersion"] = 1 as CKRecordValue
+        let record = CKRecord(recordType: TilikCloudKitSchema.RecordType.workspace, recordID: rootID(context))
+        record[TilikCloudKitSchema.Field.workspaceID] = identifier as CKRecordValue
+        record[TilikCloudKitSchema.Field.name] = name as CKRecordValue
+        record[TilikCloudKitSchema.Field.ownerAccountID] = accountID as CKRecordValue
+        record[TilikCloudKitSchema.Field.schemaVersion] = 1 as CKRecordValue
         // Persist the zone-wide share with the root record. Adding a participant
         // to a newly constructed, unsaved zone share traps inside CloudKit.
         let share = CKShare(recordZoneID: zone.zoneID)
@@ -82,7 +82,7 @@ public final class CloudKitCollaborationService: CollaborationCloudServing {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw CollaborationError.invalidName }
         let root = try await container.privateCloudDatabase.record(for: rootID(workspace.context))
-        root["name"] = trimmed as CKRecordValue
+        root[TilikCloudKitSchema.Field.name] = trimmed as CKRecordValue
         var records = [root]
         if let share = try await fetchShare(workspace) {
             share[CKShare.SystemFieldKey.title] = trimmed as CKRecordValue
@@ -115,11 +115,11 @@ public final class CloudKitCollaborationService: CollaborationCloudServing {
         guard try await accountID() == mutation.accountID else { throw CancellationError() }
         let database = database(mutation.context.scope)
         let root = try await database.record(for: rootID(mutation.context))
-        guard root["workspaceID"] as? String == mutation.event.workspaceID else {
+        guard root[TilikCloudKitSchema.Field.workspaceID] as? String == mutation.event.workspaceID else {
             throw CollaborationError.invalidWorkspace
         }
         if mutation.context.scope == .owner {
-            guard root["ownerAccountID"] as? String == mutation.accountID else {
+            guard root[TilikCloudKitSchema.Field.ownerAccountID] as? String == mutation.accountID else {
                 throw CollaborationError.notOwner
             }
         }
@@ -131,8 +131,8 @@ public final class CloudKitCollaborationService: CollaborationCloudServing {
             do {
                 let record = try await database.record(
                     for: CKRecord.ID(recordName: target, zoneID: zoneID(mutation.context)))
-                guard record.recordType == "TilikHotspot",
-                    record["workspaceID"] as? String == mutation.context.workspaceID
+                guard record.recordType == TilikCloudKitSchema.RecordType.hotspot,
+                    record[TilikCloudKitSchema.Field.workspaceID] as? String == mutation.context.workspaceID
                 else {
                     throw CollaborationError.targetUnavailable
                 }
@@ -144,20 +144,20 @@ public final class CloudKitCollaborationService: CollaborationCloudServing {
         if let attachments = mutation.attachments {
             guard attachments.urls.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) })
             else { throw CollaborationError.targetUnavailable }
-            record["thermalImage"] = CKAsset(fileURL: attachments.urls[0])
-            record["rgbImage"] = CKAsset(fileURL: attachments.urls[1])
+            record[TilikCloudKitSchema.Field.thermalImage] = CKAsset(fileURL: attachments.urls[0])
+            record[TilikCloudKitSchema.Field.rgbImage] = CKAsset(fileURL: attachments.urls[1])
         }
         if let rgbJPEGPath = mutation.rgbJPEGPath {
             guard FileManager.default.fileExists(atPath: rgbJPEGPath) else {
                 throw CollaborationError.targetUnavailable
             }
-            record["rgbImage"] = CKAsset(fileURL: URL(fileURLWithPath: rgbJPEGPath))
+            record[TilikCloudKitSchema.Field.rgbImage] = CKAsset(fileURL: URL(fileURLWithPath: rgbJPEGPath))
         }
         if let photoPath = mutation.inspectionPhotoPath {
             // Petugas' check photo rides on the same TilikResponse record.
             guard mutation.event.kind == .observed, FileManager.default.fileExists(atPath: photoPath)
             else { throw CollaborationError.targetUnavailable }
-            record["inspectionPhoto"] = CKAsset(fileURL: URL(fileURLWithPath: photoPath))
+            record[TilikCloudKitSchema.Field.inspectionPhoto] = CKAsset(fileURL: URL(fileURLWithPath: photoPath))
         }
         do {
             return try decodeEvent(await database.save(record))
@@ -174,22 +174,22 @@ public final class CloudKitCollaborationService: CollaborationCloudServing {
             let record = try await database(mutation.context.scope).record(for: recordID)
             let event = try decodeEvent(record)
             if mutation.attachments != nil {
-                guard record["thermalImage"] is CKAsset, record["rgbImage"] is CKAsset else {
+                guard record[TilikCloudKitSchema.Field.thermalImage] is CKAsset, record[TilikCloudKitSchema.Field.rgbImage] is CKAsset else {
                     throw CollaborationError.conflictingEvent
                 }
             }
-            if mutation.rgbJPEGPath != nil, record["rgbImage"] as? CKAsset == nil {
+            if mutation.rgbJPEGPath != nil, record[TilikCloudKitSchema.Field.rgbImage] as? CKAsset == nil {
                 throw CollaborationError.conflictingEvent
             }
             if mutation.inspectionPhotoPath != nil {
                 // A response saved without its photo is not a finished report.
-                guard record["inspectionPhoto"] is CKAsset else { throw CollaborationError.conflictingEvent }
+                guard record[TilikCloudKitSchema.Field.inspectionPhoto] is CKAsset else { throw CollaborationError.conflictingEvent }
             }
             if !event.representsSameIntent(as: mutation.event) {
                 guard mutation.context.scope == .owner,
                       mutation.event.repairsMissingThermalTemperature(in: event)
                 else { throw CollaborationError.conflictingEvent }
-                record["payload"] = try JSONEncoder().encode(mutation.event) as CKRecordValue
+                record[TilikCloudKitSchema.Field.payload] = try JSONEncoder().encode(mutation.event) as CKRecordValue
                 return try decodeEvent(await database(mutation.context.scope).save(record))
             }
             return event
@@ -414,7 +414,7 @@ public final class CloudKitCollaborationService: CollaborationCloudServing {
         }
         let user = try await accountID()
         let root = try await container.privateCloudDatabase.record(for: rootID(workspace.context))
-        guard root["ownerAccountID"] as? String == user else { throw CollaborationError.notOwner }
+        guard root[TilikCloudKitSchema.Field.ownerAccountID] as? String == user else { throw CollaborationError.notOwner }
     }
 
     public func fetchShare(_ workspace: TPAWorkspace) async throws -> CKShare? {

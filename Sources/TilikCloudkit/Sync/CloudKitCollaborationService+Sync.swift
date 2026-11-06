@@ -97,11 +97,11 @@ extension CloudKitCollaborationService {
                 try Task.checkCancellation()
                 let page = try await database(workspace.context.scope).recordZoneChanges(
                     inZoneWith: zoneID(workspace.context), since: token,
-                    desiredKeys: ["workspaceID", "payload"]
+                    desiredKeys: [TilikCloudKitSchema.Field.workspaceID, TilikCloudKitSchema.Field.payload]
                 )
                 for result in page.modificationResultsByID.values {
                     let record = try result.get().record
-                    if ["TilikHotspot", "TilikPing", "TilikResponse", "TilikSubzoneRun"].contains(record.recordType) {
+                    if [TilikCloudKitSchema.RecordType.hotspot, TilikCloudKitSchema.RecordType.ping, TilikCloudKitSchema.RecordType.response, TilikCloudKitSchema.RecordType.subzoneRun].contains(record.recordType) {
                         let event = try decodeEvent(record)
                         guard event.workspaceID == workspace.context.workspaceID else {
                             throw CollaborationError.invalidWorkspace

@@ -14,8 +14,8 @@ extension CloudKitCollaborationService {
     public func fetchHazardEvidenceURL(eventID: String, context: WorkspaceContext) async throws -> URL {
         let record = try await database(context.scope).record(
             for: CKRecord.ID(recordName: eventID, zoneID: zoneID(context)))
-        guard record.recordType == "TilikHotspot",
-              record["workspaceID"] as? String == context.workspaceID,
+        guard record.recordType == TilikCloudKitSchema.RecordType.hotspot,
+              record[TilikCloudKitSchema.Field.workspaceID] as? String == context.workspaceID,
               try decodeEvent(record).hazard != nil else { throw CollaborationError.targetUnavailable }
         return try evidence.fetchedEvidenceURL(record: record, eventID: eventID)
     }
@@ -23,9 +23,9 @@ extension CloudKitCollaborationService {
     public func fetchRGBHotspotImageURL(eventID: String, context: WorkspaceContext) async throws -> URL {
         let record = try await database(context.scope).record(
             for: CKRecord.ID(recordName: eventID, zoneID: zoneID(context)))
-        guard record.recordType == "TilikHotspot",
-              record["workspaceID"] as? String == context.workspaceID,
-              let source = (record["rgbImage"] as? CKAsset)?.fileURL
+        guard record.recordType == TilikCloudKitSchema.RecordType.hotspot,
+              record[TilikCloudKitSchema.Field.workspaceID] as? String == context.workspaceID,
+              let source = (record[TilikCloudKitSchema.Field.rgbImage] as? CKAsset)?.fileURL
         else { throw CollaborationError.targetUnavailable }
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("TilikRGBReceived/" + UUID().uuidString, isDirectory: true)
@@ -38,15 +38,15 @@ extension CloudKitCollaborationService {
     public func fetchHotspotImageURLs(eventID: String, context: WorkspaceContext) async throws -> [URL] {
         let record = try await database(context.scope).record(
             for: CKRecord.ID(recordName: eventID, zoneID: zoneID(context)))
-        guard record.recordType == "TilikHotspot",
-              record["workspaceID"] as? String == context.workspaceID,
-              record["thermalImage"] is CKAsset,
-              record["rgbImage"] is CKAsset else { throw CollaborationError.targetUnavailable }
+        guard record.recordType == TilikCloudKitSchema.RecordType.hotspot,
+              record[TilikCloudKitSchema.Field.workspaceID] as? String == context.workspaceID,
+              record[TilikCloudKitSchema.Field.thermalImage] is CKAsset,
+              record[TilikCloudKitSchema.Field.rgbImage] is CKAsset else { throw CollaborationError.targetUnavailable }
         let destination = FileManager.default.temporaryDirectory
             .appendingPathComponent("TilikQAReceived/" + UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
         do {
-            let fields = [("thermalImage", "thermal.png"), ("rgbImage", "rgb.jpg")]
+            let fields = [(TilikCloudKitSchema.Field.thermalImage, "thermal.png"), (TilikCloudKitSchema.Field.rgbImage, "rgb.jpg")]
             let files = try fields.map { field, name -> URL in
                 guard let source = (record[field] as? CKAsset)?.fileURL else {
                     throw CollaborationError.targetUnavailable
@@ -66,9 +66,9 @@ extension CloudKitCollaborationService {
     public func fetchInspectionPhotoData(responseID: String, context: WorkspaceContext) async throws -> Data {
         let record = try await database(context.scope).record(
             for: CKRecord.ID(recordName: responseID, zoneID: zoneID(context)))
-        guard record.recordType == "TilikResponse",
-              record["workspaceID"] as? String == context.workspaceID,
-              let url = (record["inspectionPhoto"] as? CKAsset)?.fileURL
+        guard record.recordType == TilikCloudKitSchema.RecordType.response,
+              record[TilikCloudKitSchema.Field.workspaceID] as? String == context.workspaceID,
+              let url = (record[TilikCloudKitSchema.Field.inspectionPhoto] as? CKAsset)?.fileURL
         else { throw CollaborationError.targetUnavailable }
         // Read now: CloudKit may clean its staging file at any time.
         return try Data(contentsOf: url)
@@ -76,25 +76,25 @@ extension CloudKitCollaborationService {
 
     public func encode(_ event: CollaborationEvent, context: WorkspaceContext) throws -> CKRecord {
         let types: [CollaborationEvent.Kind: String] = [
-            .hotspot: "TilikHotspot", .ping: "TilikPing", .observed: "TilikResponse",
-            .subzoneRun: "TilikSubzoneRun"
+            .hotspot: TilikCloudKitSchema.RecordType.hotspot, .ping: TilikCloudKitSchema.RecordType.ping, .observed: TilikCloudKitSchema.RecordType.response,
+            .subzoneRun: TilikCloudKitSchema.RecordType.subzoneRun
         ]
         guard let recordType = types[event.kind] else { throw CollaborationError.conflictingEvent }
         let record = CKRecord(
             recordType: recordType, recordID: CKRecord.ID(recordName: event.id, zoneID: zoneID(context)))
-        record["workspaceID"] = event.workspaceID as CKRecordValue
-        record["payload"] = try JSONEncoder().encode(event) as CKRecordValue
+        record[TilikCloudKitSchema.Field.workspaceID] = event.workspaceID as CKRecordValue
+        record[TilikCloudKitSchema.Field.payload] = try JSONEncoder().encode(event) as CKRecordValue
         evidence.encodeEvidence(record: record, event: event)
         return record
     }
 
     public func decodeEvent(_ record: CKRecord) throws -> CollaborationEvent {
-        guard ["TilikHotspot", "TilikPing", "TilikResponse", "TilikSubzoneRun"].contains(record.recordType),
-            let data = record["payload"] as? Data
+        guard [TilikCloudKitSchema.RecordType.hotspot, TilikCloudKitSchema.RecordType.ping, TilikCloudKitSchema.RecordType.response, TilikCloudKitSchema.RecordType.subzoneRun].contains(record.recordType),
+            let data = record[TilikCloudKitSchema.Field.payload] as? Data
         else { throw CollaborationError.invalidWorkspace }
         var event = try JSONDecoder().decode(CollaborationEvent.self, from: data)
         guard event.id == record.recordID.recordName,
-            event.workspaceID == record["workspaceID"] as? String
+            event.workspaceID == record[TilikCloudKitSchema.Field.workspaceID] as? String
         else { throw CollaborationError.invalidWorkspace }
         event.serverCreatedAt = record.creationDate
         evidence.decodeEvidence(record: record, event: event)
@@ -102,9 +102,9 @@ extension CloudKitCollaborationService {
     }
 
     public func decodeWorkspace(_ record: CKRecord, scope: WorkspaceContext.Scope) throws -> TPAWorkspace {
-        guard record.recordType == "TilikWorkspace", let identifier = record["workspaceID"] as? String,
-            let name = record["name"] as? String, let owner = record["ownerAccountID"] as? String,
-            (record["schemaVersion"] as? NSNumber)?.intValue == 1
+        guard record.recordType == TilikCloudKitSchema.RecordType.workspace, let identifier = record[TilikCloudKitSchema.Field.workspaceID] as? String,
+            let name = record[TilikCloudKitSchema.Field.name] as? String, let owner = record[TilikCloudKitSchema.Field.ownerAccountID] as? String,
+            (record[TilikCloudKitSchema.Field.schemaVersion] as? NSNumber)?.intValue == 1
         else { throw CollaborationError.invalidWorkspace }
         let zone = record.recordID.zoneID
         return TPAWorkspace(
