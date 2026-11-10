@@ -46,7 +46,9 @@ extension CloudKitCollaborationService {
         }
         record[TilikCloudKitSchema.Field.participantID] = participant.participantID as CKRecordValue
         record[TilikCloudKitSchema.Field.name] = name as CKRecordValue
-        record[TilikCloudKitSchema.Field.email] = email?.trimmingCharacters(in: .whitespacesAndNewlines) as CKRecordValue?
+        if let email {
+            record[TilikCloudKitSchema.Field.email] = email.trimmingCharacters(in: .whitespacesAndNewlines) as CKRecordValue
+        }
         _ = try await db.save(record)
     }
 

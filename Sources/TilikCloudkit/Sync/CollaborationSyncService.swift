@@ -298,9 +298,15 @@ public final class CollaborationSyncService {
             else { throw CollaborationError.targetUnavailable }
         }
         if let inspectionPhotoPath {
-            guard event.kind == .observed, event.inspectionReport?.hasPhoto == true,
+            guard (event.kind == .observed || event.kind == .assignmentResponse), event.inspectionReport?.hasPhoto == true,
                   FileManager.default.fileExists(atPath: inspectionPhotoPath)
             else { throw CollaborationError.targetUnavailable }
+        }
+        if event.kind == .assignmentResponse, event.inspectionReport != nil {
+            guard let task = event.assignment, let pointID = event.hotspotID,
+                  task.points.contains(where: { $0.id == pointID }), task.status == .accepted else {
+                throw CollaborationError.targetUnavailable
+            }
         }
         if event.kind == .observed {
             guard workspace.context.scope == .participant || workspace.ownerAccountID == value.accountID,
@@ -451,7 +457,7 @@ public final class CollaborationSyncService {
                 !current.resetInProgress.contains(mutation.context.key),
                 current.deletingWorkspaceKeys?.contains(mutation.context.key) != true
             else { continue }
-            if let target = mutation.event.hotspotID,
+            if mutation.event.kind == .observed, let target = mutation.event.hotspotID,
                 !current.events[mutation.context.key, default: []].contains(where: {
                     $0.id == target && $0.kind == .hotspot
                 })
@@ -462,6 +468,7 @@ public final class CollaborationSyncService {
                 if let accepted = try await cloud.reconcile(mutation) {
                     try ensureSession(session)
                     try acknowledge(accepted, mutation: mutation)
+                    await notifyAssignmentSent(mutation)
                     changed = true
                 }
                 continue
@@ -479,6 +486,7 @@ public final class CollaborationSyncService {
                 let accepted = try await cloud.save(mutation)
                 try ensureSession(session)
                 try acknowledge(accepted, mutation: mutation)
+                await notifyAssignmentSent(mutation)
                 CollaborationDiagnostics.record("save_ack", operation: mutation.id)
                 changed = true
             } catch {
@@ -498,6 +506,20 @@ public final class CollaborationSyncService {
             }
         }
         return changed
+    }
+
+    private func notifyAssignmentSent(_ mutation: PendingMutation) async {
+        guard mutation.context.scope == .owner, mutation.event.kind == .assignment,
+              let task = mutation.event.assignment else { return }
+        // Scheduling an alert must never undo an already acknowledged CloudKit write.
+        do {
+            _ = try await alerts.schedule(id: mutation.accountID + "|assignment-sent|" + mutation.id,
+                body: "Tugas \(task.subzoneName) berhasil dikirim, menunggu jawaban petugas.",
+                route: ["tilikRoute": "assignmentSent", "workspaceID": task.workspaceID,
+                        "subzoneID": task.subzoneID, "pointID": task.scope == .hotspot ? task.points.first?.id ?? "" : ""])
+        } catch {
+            CollaborationDiagnostics.failure("assignment_sent_notification_failed", error: error, operation: mutation.id)
+        }
     }
 
     private func acknowledge(_ event: CollaborationEvent, mutation: PendingMutation) throws {

@@ -12,5 +12,12 @@ public protocol CollaborationAlertServing {
     func requestPermission() async throws -> Bool
     /// Returns false when alerts are intentionally suppressed by system permission.
     func schedule(id: String, body: String) async throws -> Bool
+    func schedule(id: String, body: String, route: [String: String]) async throws -> Bool
     func cancelPending()
+}
+
+public extension CollaborationAlertServing {
+    func schedule(id: String, body: String, route: [String: String]) async throws -> Bool {
+        try await schedule(id: id, body: body)
+    }
 }

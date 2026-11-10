@@ -152,6 +152,27 @@ extension CollaborationSyncService {
         return value
     }
 
+    /// Notify only for a verified newly accepted invitation; do not repeat on refresh.
+    public func notifyMemberConnected(_ member: CollaborationMember, in workspace: TPAWorkspace) async {
+        guard workspace.context.scope == .owner, !member.isOwner,
+              let account = snapshot?.accountID, workspace.ownerAccountID == account,
+              snapshot?.workspaces.contains(workspace) == true else { return }
+        let session = generation
+        let key = workspace.id + "|member-connected:" + member.id
+        guard snapshot?.alertLedger[key] == nil else { return }
+        let name = member.name ?? member.email ?? "petugas"
+        do {
+            let scheduled = try await alerts.schedule(id: account + "|" + key,
+                body: "Berhasil terhubung dengan \(name).", route: [:])
+            try ensureSession(session)
+            guard var value = snapshot, value.accountID == account,
+                  value.workspaces.contains(workspace) else { return }
+            value.alertLedger[key] = scheduled ? .scheduled : .suppressed
+            try commit(value)
+        } catch is CancellationError { return }
+        catch { CollaborationDiagnostics.failure("member_connected_notification_failed", error: error) }
+    }
+
     public func revoke(_ memberID: String?, workspace: TPAWorkspace) async throws {
         try await performStructural { _ in
             try requireOwner(workspace)

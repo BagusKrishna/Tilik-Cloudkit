@@ -42,7 +42,7 @@ extension CollaborationSyncService {
             }
             for index in value.pending.indices where value.pending[index].context.key == workspace.id {
                 let mutation = value.pending[index]
-                if let target = mutation.event.hotspotID,
+                if mutation.event.kind == .observed, let target = mutation.event.hotspotID,
                     !value.events[workspace.id, default: []].contains(where: {
                         $0.id == target && $0.kind == .hotspot
                     })
@@ -65,9 +65,21 @@ extension CollaborationSyncService {
         guard let current = snapshot else { return }
         for workspace in current.workspaces {
             let workspaceEvents = current.events[workspace.id, default: []]
+            let needsParticipantID = workspace.context.scope == .participant && workspaceEvents.contains { $0.kind == .assignment }
+            let participantID: String? = needsParticipantID ? try? await cloud.officerParticipantID(in: workspace) : nil
+            let needsMemberNames = workspace.context.scope == .owner && workspaceEvents.contains { event in
+                guard event.kind == .assignmentResponse, event.senderID != current.accountID else { return false }
+                return current.alertLedger[CollaborationPolicy.alertKey(event: event, workspaceKey: workspace.id)] == nil
+            }
+            let alertMembers: [CollaborationMember] = needsMemberNames ? (try? await cloud.members(of: workspace)) ?? [] : []
             let visibleHotspotIDs = Set(SubzoneRunProjector.activeHotspots(workspaceEvents).map(\.id))
             let knownHotspotIDs = Set(workspaceEvents.filter { $0.kind == .hotspot }.map(\.id))
             for event in current.events[workspace.id, default: []] {
+                if event.kind == .assignment, workspace.context.scope == .participant {
+                    // Retry on a later sync if CloudKit cannot provide the participant yet.
+                    guard let participantID else { continue }
+                    guard event.assignment?.recipientID == participantID else { continue }
+                }
                 if event.kind == .hotspot, !visibleHotspotIDs.contains(event.id) { continue }
                 if event.kind == .observed, let target = event.hotspotID,
                    knownHotspotIDs.contains(target), !visibleHotspotIDs.contains(target) { continue }
@@ -75,6 +87,12 @@ extension CollaborationSyncService {
                 let disposition = snapshot?.alertLedger[key]
                 if disposition == .scheduled || disposition == .suppressed { continue }
                 var body = alertBody(event, workspace.context.scope)
+                if workspace.context.scope == .owner, event.kind == .assignmentResponse,
+                   let task = event.assignment, let currentBody = body {
+                    let member = alertMembers.first { $0.id == task.recipientID }
+                    let name = member?.name ?? member?.email ?? "petugas"
+                    body = event.inspectionReport == nil ? "\(currentBody) oleh \(name)" : "\(currentBody) dari \(name)"
+                }
                 if event.kind == .observed && body != nil {
                     let hotspots = current.events[workspace.id, default: []].filter { $0.kind == .hotspot }
                         .sorted {
@@ -101,8 +119,10 @@ extension CollaborationSyncService {
                 do {
                     try ensureSession(session)
                     CollaborationDiagnostics.record("notification_enqueued", operation: event.id)
+                    let route: [String: String] = event.kind == .assignmentResponse && workspace.context.scope == .owner
+                        ? ["tilikRoute": "assignments", "workspaceID": workspace.context.workspaceID, "taskID": event.assignment?.id ?? ""] : [:]
                     let scheduled = try await alerts.schedule(
-                        id: current.accountID + "|" + key, body: body ?? "")
+                        id: current.accountID + "|" + key, body: body ?? "", route: route)
                     try ensureSession(session)
                     guard var value = snapshot else { return }
                     value.alertLedger[key] = scheduled ? .scheduled : .suppressed

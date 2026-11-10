@@ -34,6 +34,10 @@ struct OfficerAssignmentTests {
         var reply = tasks[0]; reply.status = .accepted; reply.respondedAt = now.addingTimeInterval(3)
         events.append(CollaborationEvent(id: "response", workspaceID: "workspace", kind: .assignmentResponse,
             senderID: "officer-a", senderRole: .officer, assignment: reply, clientCreatedAt: now.addingTimeInterval(3)))
+        let report = InspectionReport(note: "Sudah disiram", hasPhoto: false, photoSHA256: nil)
+        events.append(CollaborationEvent(id: "point-report", workspaceID: "workspace", kind: .assignmentResponse,
+            senderID: "officer-a", senderRole: .officer, hotspotID: "point-0", inspectionReport: report,
+            assignment: reply, clientCreatedAt: now.addingTimeInterval(4)))
         #expect(OfficerAssignmentProjector.current(events, recipientID: "a").first?.status == .accepted)
         #expect(OfficerAssignmentProjector.current(events, recipientID: "b").first?.status == .pending)
         #expect(OfficerAssignmentProjector.current(events, recipientID: "a").first?.points.count == 10)

@@ -7,7 +7,7 @@ public enum OfficerAssignmentProjector {
             guard var task = original.assignment, task.isValid, task.status == .pending, task.id == original.id,
                   recipientID == nil || task.recipientID == recipientID else { return nil }
             let responses = events.filter {
-                guard $0.kind == .assignmentResponse, $0.senderRole == .officer,
+                guard $0.kind == .assignmentResponse, $0.senderRole == .officer, $0.inspectionReport == nil,
                       var response = $0.assignment, response.isValid,
                       response.status == .accepted || response.status == .rejected || response.status == .completed else { return false }
                 response.status = .pending

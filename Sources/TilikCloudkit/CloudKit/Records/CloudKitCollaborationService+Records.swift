@@ -66,7 +66,7 @@ extension CloudKitCollaborationService {
     public func fetchInspectionPhotoData(responseID: String, context: WorkspaceContext) async throws -> Data {
         let record = try await database(context.scope).record(
             for: CKRecord.ID(recordName: responseID, zoneID: zoneID(context)))
-        guard record.recordType == TilikCloudKitSchema.RecordType.response,
+        guard [TilikCloudKitSchema.RecordType.response, TilikCloudKitSchema.RecordType.assignmentResponse].contains(record.recordType),
               record[TilikCloudKitSchema.Field.workspaceID] as? String == context.workspaceID,
               let url = (record[TilikCloudKitSchema.Field.inspectionPhoto] as? CKAsset)?.fileURL
         else { throw CollaborationError.targetUnavailable }

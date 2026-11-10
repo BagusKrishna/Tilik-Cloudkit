@@ -144,6 +144,12 @@ public final class CloudKitCollaborationService: CollaborationCloudServing {
                   original.assignment == expected else {
                 throw CollaborationError.conflictingEvent
             }
+            if mutation.event.inspectionReport != nil {
+                guard response.status == .accepted, let pointID = mutation.event.hotspotID,
+                      response.points.contains(where: { $0.id == pointID }) else {
+                    throw CollaborationError.targetUnavailable
+                }
+            }
         }
         if mutation.event.kind == .observed {
             guard let target = mutation.event.hotspotID else {
@@ -176,7 +182,7 @@ public final class CloudKitCollaborationService: CollaborationCloudServing {
         }
         if let photoPath = mutation.inspectionPhotoPath {
             // Petugas' check photo rides on the same TilikResponse record.
-            guard mutation.event.kind == .observed, FileManager.default.fileExists(atPath: photoPath)
+            guard (mutation.event.kind == .observed || mutation.event.kind == .assignmentResponse), FileManager.default.fileExists(atPath: photoPath)
             else { throw CollaborationError.targetUnavailable }
             record[TilikCloudKitSchema.Field.inspectionPhoto] = CKAsset(fileURL: URL(fileURLWithPath: photoPath))
         }
