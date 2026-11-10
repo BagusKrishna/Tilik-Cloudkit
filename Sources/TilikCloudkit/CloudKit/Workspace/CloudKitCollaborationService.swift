@@ -246,22 +246,26 @@ public final class CloudKitCollaborationService: CollaborationCloudServing {
     public func members(of workspace: TPAWorkspace) async throws -> [CollaborationMember]? {
         try await verifyOwner(workspace)
         guard let share = try await fetchShare(workspace) else { return nil }
-        return share.participants.filter {
+        let participants = share.participants.filter {
             $0.role == .owner || $0.acceptanceStatus == .accepted
-        }.map { participant in
+        }
+        var members: [CollaborationMember] = []
+        for participant in participants {
             let identity = participant.userIdentity
             let name = identity.nameComponents.map { PersonNameComponentsFormatter().string(from: $0) }
+            let details = participant.role == .owner ? (nil, nil) : await officerDetails(for: participant, workspace: workspace)
             let permission: CollaborationMember.Permission
             switch participant.permission {
             case .readOnly: permission = .readOnly
             case .readWrite: permission = .readWrite
             default: permission = .unknown
             }
-            return CollaborationMember(
-                id: participant.participantID, name: name, email: identity.lookupInfo?.emailAddress,
+            members.append(CollaborationMember(
+                id: participant.participantID, name: details.0 ?? name, email: details.1 ?? identity.lookupInfo?.emailAddress,
                 permission: permission, isOwner: participant.role == .owner
-            )
+            ))
         }
+        return members
     }
 
     public func cancelInvitation(

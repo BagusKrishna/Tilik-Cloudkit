@@ -8,6 +8,8 @@ public enum TilikCloudKitSchema {
         public static let ping = "TilikPing"
         public static let response = "TilikResponse"
         public static let subzoneRun = "TilikSubzoneRun"
+        public static let officerProfile = "TilikOfficerProfile"
+        public static let officerIdentity = "TilikOfficerIdentity"
         public static let events = [hotspot, ping, response, subzoneRun]
     }
 
@@ -27,5 +29,7 @@ public enum TilikCloudKitSchema {
         public static let evidence = "evidence"
         public static let annotatedEvidence = "annotatedEvidence"
         public static let evidenceMetadata = "evidenceMetadata"
+        public static let participantID = "participantID"
+        public static let email = "email"
     }
 }

@@ -54,6 +54,8 @@ public protocol CollaborationCloudServing {
         -> CollaborationInvitationCancellation
     /// Includes the owner and accepted participants; identity is available only when CloudKit provides it.
     func members(of workspace: TPAWorkspace) async throws -> [CollaborationMember]?
+    func officerEmail(in workspace: TPAWorkspace) async throws -> String?
+    func saveOfficerProfile(name: String, email: String?, in workspace: TPAWorkspace) async throws
     func revoke(memberID: String?, workspace: TPAWorkspace) async throws
     func join(url: URL, accountID: String) async throws
     func leave(_ workspace: TPAWorkspace, accountID: String) async throws
@@ -65,6 +67,10 @@ public protocol CollaborationCloudServing {
 }
 
 public extension CollaborationCloudServing {
+    func officerEmail(in workspace: TPAWorkspace) async throws -> String? { nil }
+    func saveOfficerProfile(name: String, email: String?, in workspace: TPAWorkspace) async throws {
+        throw CollaborationError.accountUnavailable
+    }
     func message(for error: Error) -> String {
         "Pembaruan iCloud belum selesai. Data tersimpan tetap tersedia; periksa koneksi dan coba lagi."
     }
