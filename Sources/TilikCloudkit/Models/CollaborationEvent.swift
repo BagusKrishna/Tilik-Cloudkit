@@ -36,7 +36,7 @@ public struct CollaborationSubzoneRun: Codable, Equatable, Sendable {
 
 /// Immutable collaboration events use stable IDs across retries and devices.
 public struct CollaborationEvent: Identifiable, Codable, Equatable, Sendable {
-    public enum Kind: String, Codable, Sendable { case hotspot, ping, observed, subzoneRun }
+    public enum Kind: String, Codable, Sendable { case hotspot, ping, observed, subzoneRun, assignment, assignmentResponse }
     public enum InspectionStatus: String, Codable, Sendable {
         case observed, unobserved
         public var title: String { self == .observed ? "Sudah Dipantau" : "Belum Dipantau" }
@@ -91,6 +91,7 @@ public struct CollaborationEvent: Identifiable, Codable, Equatable, Sendable {
     public let hazard: HazardReport?
     /// A marker written only after every verified hotspot in this subzone run is acknowledged.
     public let subzoneRun: CollaborationSubzoneRun?
+    public let assignment: OfficerAssignment?
     public var serverCreatedAt: Date?
 
     public init(
@@ -107,6 +108,7 @@ public struct CollaborationEvent: Identifiable, Codable, Equatable, Sendable {
         inspectionReport: InspectionReport? = nil,
         hazard: HazardReport? = nil,
         subzoneRun: CollaborationSubzoneRun? = nil,
+        assignment: OfficerAssignment? = nil,
         clientCreatedAt: Date = Date()
     ) {
         self.inspectionReport = inspectionReport
@@ -123,6 +125,7 @@ public struct CollaborationEvent: Identifiable, Codable, Equatable, Sendable {
         self.hotspotDetails = hotspotDetails
         self.hazard = hazard
         self.subzoneRun = subzoneRun
+        self.assignment = assignment
     }
 
     /// Server timestamps do not change the identity of an already accepted intent.

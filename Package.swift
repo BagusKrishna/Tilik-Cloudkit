@@ -5,6 +5,6 @@ let package = Package(
     name: "Tilik-Cloudkit",
     platforms: [.iOS(.v17)],
     products: [.library(name: "Tilik-Cloudkit", targets: ["TilikCloudkit"])],
-    targets: [.target(name: "TilikCloudkit")],
+    targets: [.target(name: "TilikCloudkit"), .testTarget(name: "TilikCloudkitTests", dependencies: ["TilikCloudkit"])],
     swiftLanguageModes: [.v5]
 )

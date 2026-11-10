@@ -101,7 +101,7 @@ extension CloudKitCollaborationService {
                 )
                 for result in page.modificationResultsByID.values {
                     let record = try result.get().record
-                    if [TilikCloudKitSchema.RecordType.hotspot, TilikCloudKitSchema.RecordType.ping, TilikCloudKitSchema.RecordType.response, TilikCloudKitSchema.RecordType.subzoneRun].contains(record.recordType) {
+                    if [TilikCloudKitSchema.RecordType.hotspot, TilikCloudKitSchema.RecordType.ping, TilikCloudKitSchema.RecordType.response, TilikCloudKitSchema.RecordType.subzoneRun, TilikCloudKitSchema.RecordType.assignment, TilikCloudKitSchema.RecordType.assignmentResponse].contains(record.recordType) {
                         let event = try decodeEvent(record)
                         guard event.workspaceID == workspace.context.workspaceID else {
                             throw CollaborationError.invalidWorkspace

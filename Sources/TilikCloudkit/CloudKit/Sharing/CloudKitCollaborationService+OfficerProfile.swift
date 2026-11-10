@@ -28,6 +28,10 @@ extension CloudKitCollaborationService {
         } catch let error as CKError where error.code == .unknownItem { return nil }
     }
 
+    public func officerParticipantID(in workspace: TPAWorkspace) async throws -> String? {
+        try await participantShare(workspace).currentUserParticipant?.participantID
+    }
+
     public func saveOfficerProfile(name: String, email: String?, in workspace: TPAWorkspace) async throws {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { throw CollaborationError.invalidName }

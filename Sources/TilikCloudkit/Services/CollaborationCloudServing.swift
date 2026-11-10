@@ -55,6 +55,7 @@ public protocol CollaborationCloudServing {
     /// Includes the owner and accepted participants; identity is available only when CloudKit provides it.
     func members(of workspace: TPAWorkspace) async throws -> [CollaborationMember]?
     func officerEmail(in workspace: TPAWorkspace) async throws -> String?
+    func officerParticipantID(in workspace: TPAWorkspace) async throws -> String?
     func saveOfficerProfile(name: String, email: String?, in workspace: TPAWorkspace) async throws
     func revoke(memberID: String?, workspace: TPAWorkspace) async throws
     func join(url: URL, accountID: String) async throws
@@ -68,6 +69,7 @@ public protocol CollaborationCloudServing {
 
 public extension CollaborationCloudServing {
     func officerEmail(in workspace: TPAWorkspace) async throws -> String? { nil }
+    func officerParticipantID(in workspace: TPAWorkspace) async throws -> String? { nil }
     func saveOfficerProfile(name: String, email: String?, in workspace: TPAWorkspace) async throws {
         throw CollaborationError.accountUnavailable
     }

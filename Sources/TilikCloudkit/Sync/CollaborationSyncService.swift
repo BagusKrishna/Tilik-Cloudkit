@@ -274,6 +274,19 @@ public final class CollaborationSyncService {
                   run.eventIDsDigest.count == 64
             else { throw CollaborationError.invalidWorkspace }
         }
+        if event.kind == .assignment || event.kind == .assignmentResponse {
+            guard let task = event.assignment, task.isValid, task.workspaceID == workspace.context.workspaceID else {
+                throw CollaborationError.invalidWorkspace
+            }
+            if event.kind == .assignment {
+                guard workspace.context.scope == .owner, task.status == .pending else { throw CollaborationError.notOwner }
+            } else {
+                guard workspace.context.scope == .participant,
+                      task.status == .accepted || task.status == .rejected || task.status == .completed else {
+                    throw CollaborationError.notOwner
+                }
+            }
+        }
         if let attachments {
             guard event.kind == .hotspot, event.hotspotDetails?.source == .thermal,
                   attachments.urls.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) })

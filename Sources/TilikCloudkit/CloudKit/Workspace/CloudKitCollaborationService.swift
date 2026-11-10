@@ -124,6 +124,27 @@ public final class CloudKitCollaborationService: CollaborationCloudServing {
             }
         }
         if let existing = try await reconcile(mutation) { return existing }
+        if mutation.event.kind == .assignmentResponse {
+            guard mutation.context.scope == .participant, let response = mutation.event.assignment else {
+                throw CollaborationError.invalidWorkspace
+            }
+            let shareID = CKRecord.ID(recordName: CKRecordNameZoneWideShare, zoneID: zoneID(mutation.context))
+            guard let share = try await database.record(for: shareID) as? CKShare,
+                  share.currentUserParticipant?.participantID == response.recipientID else {
+                throw CollaborationError.notOwner
+            }
+            let taskID = CKRecord.ID(recordName: response.id, zoneID: zoneID(mutation.context))
+            let original = try decodeEvent(await database.record(for: taskID))
+            var expected = response
+            expected.status = .pending
+            expected.respondedAt = nil
+            expected.rejectionReason = nil
+            guard original.kind == .assignment, original.senderRole == .operatorRole,
+                  original.senderID == (root[TilikCloudKitSchema.Field.ownerAccountID] as? String),
+                  original.assignment == expected else {
+                throw CollaborationError.conflictingEvent
+            }
+        }
         if mutation.event.kind == .observed {
             guard let target = mutation.event.hotspotID else {
                 throw CollaborationError.targetUnavailable
