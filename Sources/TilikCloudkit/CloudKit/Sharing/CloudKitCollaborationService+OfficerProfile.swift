@@ -32,6 +32,39 @@ extension CloudKitCollaborationService {
         try await participantShare(workspace).currentUserParticipant?.participantID
     }
 
+    public func renameOfficer(memberID: String, name: String, in workspace: TPAWorkspace) async throws {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { throw CollaborationError.invalidName }
+        try await verifyOwner(workspace)
+        guard let share = try await fetchShare(workspace), share.participants.contains(where: {
+            $0.participantID == memberID && $0.role != .owner && $0.acceptanceStatus == .accepted
+        }) else { throw CollaborationError.invalidShare }
+        let id = officerRecordID("officer-profile-", participantID: memberID, workspace: workspace)
+        let db = database(.owner)
+        let record: CKRecord
+        do { record = try await db.record(for: id) }
+        catch let error as CKError where error.code == .unknownItem {
+            record = CKRecord(recordType: TilikCloudKitSchema.RecordType.officerProfile, recordID: id)
+        }
+        record[TilikCloudKitSchema.Field.participantID] = memberID as CKRecordValue
+        record[TilikCloudKitSchema.Field.name] = name as CKRecordValue
+        _ = try await db.save(record)
+    }
+
+    public func officerProfileName(in workspace: TPAWorkspace) async throws -> String? {
+        let share = try await participantShare(workspace)
+        guard let participant = share.currentUserParticipant else { throw CollaborationError.invalidShare }
+        let id = officerRecordID("officer-profile-", participantID: participant.participantID, workspace: workspace)
+        let record: CKRecord
+        do { record = try await database(.participant).record(for: id) }
+        catch let error as CKError where error.code == .unknownItem { return nil }
+        guard record[TilikCloudKitSchema.Field.participantID] as? String == participant.participantID else { return nil }
+        let allowed = Set([workspace.ownerAccountID, participant.userIdentity.userRecordID?.recordName].compactMap { $0 })
+        guard let creator = record.creatorUserRecordID?.recordName, let modifier = record.lastModifiedUserRecordID?.recordName,
+              allowed.contains(creator), allowed.contains(modifier) else { return nil }
+        return record[TilikCloudKitSchema.Field.name] as? String
+    }
+
     public func saveOfficerProfile(name: String, email: String?, in workspace: TPAWorkspace) async throws {
         let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { throw CollaborationError.invalidName }
@@ -73,8 +106,11 @@ extension CloudKitCollaborationService {
         let id = officerRecordID("officer-profile-", participantID: participantID, workspace: workspace)
         guard let record = try? await db.record(for: id),
               record[TilikCloudKitSchema.Field.participantID] as? String == participantID else { return (nil, email) }
-        if let userID = participant.userIdentity.userRecordID,
-           (record.creatorUserRecordID != userID || record.lastModifiedUserRecordID != userID) { return (nil, email) }
+        if let userID = participant.userIdentity.userRecordID {
+            let allowed = Set([workspace.ownerAccountID, userID.recordName])
+            guard let creator = record.creatorUserRecordID?.recordName, let modifier = record.lastModifiedUserRecordID?.recordName,
+                  allowed.contains(creator), allowed.contains(modifier) else { return (nil, email) }
+        }
         return (record[TilikCloudKitSchema.Field.name] as? String,
                 email ?? (record[TilikCloudKitSchema.Field.email] as? String))
     }
