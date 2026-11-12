@@ -12,6 +12,7 @@ public enum TilikCloudKitSchema {
         public static let officerIdentity = "TilikOfficerIdentity"
         public static let assignment = "TilikAssignment"
         public static let assignmentResponse = "TilikAssignmentResponse"
+        public static let memberConnected = "TilikMemberConnected"
         public static let events = [hotspot, ping, response, subzoneRun]
     }
 

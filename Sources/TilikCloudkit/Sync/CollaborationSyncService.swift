@@ -274,6 +274,10 @@ public final class CollaborationSyncService {
                   run.eventIDsDigest.count == 64
             else { throw CollaborationError.invalidWorkspace }
         }
+        if event.kind == .memberConnected {
+            guard workspace.context.scope == .owner, workspace.ownerAccountID == value.accountID,
+                  let memberID = event.memberID, !memberID.isEmpty else { throw CollaborationError.notOwner }
+        }
         if event.kind == .assignment || event.kind == .assignmentResponse {
             guard let task = event.assignment, task.isValid, task.workspaceID == workspace.context.workspaceID else {
                 throw CollaborationError.invalidWorkspace

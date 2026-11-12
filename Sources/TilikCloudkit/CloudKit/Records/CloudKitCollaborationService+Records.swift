@@ -79,7 +79,8 @@ extension CloudKitCollaborationService {
             .hotspot: TilikCloudKitSchema.RecordType.hotspot, .ping: TilikCloudKitSchema.RecordType.ping, .observed: TilikCloudKitSchema.RecordType.response,
             .subzoneRun: TilikCloudKitSchema.RecordType.subzoneRun,
             .assignment: TilikCloudKitSchema.RecordType.assignment,
-            .assignmentResponse: TilikCloudKitSchema.RecordType.assignmentResponse
+            .assignmentResponse: TilikCloudKitSchema.RecordType.assignmentResponse,
+            .memberConnected: TilikCloudKitSchema.RecordType.memberConnected
         ]
         guard let recordType = types[event.kind] else { throw CollaborationError.conflictingEvent }
         let record = CKRecord(
@@ -91,7 +92,7 @@ extension CloudKitCollaborationService {
     }
 
     public func decodeEvent(_ record: CKRecord) throws -> CollaborationEvent {
-        guard [TilikCloudKitSchema.RecordType.hotspot, TilikCloudKitSchema.RecordType.ping, TilikCloudKitSchema.RecordType.response, TilikCloudKitSchema.RecordType.subzoneRun, TilikCloudKitSchema.RecordType.assignment, TilikCloudKitSchema.RecordType.assignmentResponse].contains(record.recordType),
+        guard [TilikCloudKitSchema.RecordType.hotspot, TilikCloudKitSchema.RecordType.ping, TilikCloudKitSchema.RecordType.response, TilikCloudKitSchema.RecordType.subzoneRun, TilikCloudKitSchema.RecordType.assignment, TilikCloudKitSchema.RecordType.assignmentResponse, TilikCloudKitSchema.RecordType.memberConnected].contains(record.recordType),
             let data = record[TilikCloudKitSchema.Field.payload] as? Data
         else { throw CollaborationError.invalidWorkspace }
         var event = try JSONDecoder().decode(CollaborationEvent.self, from: data)

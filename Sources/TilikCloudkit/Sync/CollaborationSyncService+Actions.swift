@@ -159,6 +159,15 @@ extension CollaborationSyncService {
               snapshot?.workspaces.contains(workspace) == true else { return }
         let session = generation
         let key = workspace.id + "|member-connected:" + member.id
+        let eventID = "member-connected-" + member.id
+        if !(snapshot?.events[workspace.id, default: []].contains { $0.id == eventID } ?? false),
+           !(snapshot?.pending.contains { $0.id == eventID } ?? false) {
+            do {
+                try enqueue(CollaborationEvent(id: eventID, workspaceID: workspace.context.workspaceID,
+                                               kind: .memberConnected, senderID: account,
+                                               senderRole: .operatorRole, memberID: member.id), in: workspace)
+            } catch { CollaborationDiagnostics.failure("member_connected_history_failed", error: error) }
+        }
         guard snapshot?.alertLedger[key] == nil else { return }
         let name = member.name ?? member.email ?? "petugas"
         do {

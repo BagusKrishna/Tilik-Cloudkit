@@ -3,6 +3,15 @@ import Testing
 @testable import TilikCloudkit
 
 struct OfficerAssignmentTests {
+    @Test func connectionEventAndLegacyEventRoundTrip() throws {
+        let connected = CollaborationEvent(id: "member-connected-a", workspaceID: "w", kind: .memberConnected,
+                                           senderID: "owner", senderRole: .operatorRole, memberID: "a")
+        let encoded = try JSONEncoder().encode(connected)
+        #expect(try JSONDecoder().decode(CollaborationEvent.self, from: encoded) == connected)
+        let legacy = CollaborationEvent(id: "old", workspaceID: "w", kind: .ping, senderID: "owner", senderRole: .operatorRole)
+        let legacyData = try JSONEncoder().encode(legacy)
+        #expect(try JSONDecoder().decode(CollaborationEvent.self, from: legacyData).memberID == nil)
+    }
     @Test func subzoneAndSinglePointRoundTrip() throws {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let points = (0..<10).map { index in
