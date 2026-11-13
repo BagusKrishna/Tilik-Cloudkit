@@ -13,7 +13,7 @@ public enum OfficerAssignmentProjector {
                 response.status = .pending
                 response.respondedAt = nil
                 response.rejectionReason = nil
-                return response == task
+                return task.matchesLegacyResponse(response)
             }
             if let response = responses.max(by: { ($0.serverCreatedAt ?? $0.clientCreatedAt, $0.id) < ($1.serverCreatedAt ?? $1.clientCreatedAt, $1.id) }),
                let value = response.assignment, value.isValid {

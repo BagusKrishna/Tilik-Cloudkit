@@ -3,6 +3,24 @@ import Testing
 @testable import TilikCloudkit
 
 struct OfficerAssignmentTests {
+    @Test func legacyResponsesPreserveDetectionAndRejectAlteredData() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let point = OfficerAssignment.Point(id: "p", name: "Asap", latitude: 1, longitude: 104, temperatureC: 48, isFire: false, detectionType: "smoke")
+        let oldPoint = OfficerAssignment.Point(id: "p", name: "Asap", latitude: 1, longitude: 104, temperatureC: 48, isFire: false)
+        func task(_ p: OfficerAssignment.Point) -> OfficerAssignment {
+            OfficerAssignment(id: "t", workspaceID: "w", recipientID: "a", zoneID: "z", subzoneID: "a1", subzoneName: "A1", scope: .hotspot, points: [p], sentAt: now, deadline: now, isSimulation: true)
+        }
+        let original = task(point)
+        #expect(point.isCritical && point.kind == "smoke")
+        #expect(original.matchesLegacyResponse(task(oldPoint)))
+        #expect(!original.matchesLegacyResponse(task(.init(id: "p", name: "Asap", latitude: 2, longitude: 104, temperatureC: 48, isFire: false))))
+        var legacy = task(oldPoint); legacy.status = .rejected; legacy.rejectionReason = "Tidak tersedia"
+        let events = [CollaborationEvent(id: "t", workspaceID: "w", kind: .assignment, senderID: "owner", senderRole: .operatorRole, assignment: original),
+                      CollaborationEvent(workspaceID: "w", kind: .assignmentResponse, senderID: "a", senderRole: .officer, assignment: legacy)]
+        let projected = try #require(OfficerAssignmentProjector.current(events).first)
+        #expect(projected.status == .rejected && projected.points.first?.kind == "smoke")
+        #expect(try JSONDecoder().decode(OfficerAssignment.self, from: JSONEncoder().encode(task(oldPoint))) == task(oldPoint))
+    }
     @Test func connectionEventAndLegacyEventRoundTrip() throws {
         let connected = CollaborationEvent(id: "member-connected-a", workspaceID: "w", kind: .memberConnected,
                                            senderID: "owner", senderRole: .operatorRole, memberID: "a")

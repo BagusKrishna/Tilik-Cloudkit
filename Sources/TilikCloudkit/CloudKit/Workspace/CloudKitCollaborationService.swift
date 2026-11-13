@@ -141,7 +141,7 @@ public final class CloudKitCollaborationService: CollaborationCloudServing {
             expected.rejectionReason = nil
             guard original.kind == .assignment, original.senderRole == .operatorRole,
                   original.senderID == (root[TilikCloudKitSchema.Field.ownerAccountID] as? String),
-                  original.assignment == expected else {
+                  original.assignment?.matchesLegacyResponse(expected) == true else {
                 throw CollaborationError.conflictingEvent
             }
             if mutation.event.inspectionReport != nil {

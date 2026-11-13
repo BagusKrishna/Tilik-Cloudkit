@@ -12,11 +12,21 @@ public struct OfficerAssignment: Codable, Equatable, Identifiable, Sendable {
         public let longitude: Double
         public let temperatureC: Double?
         public let isFire: Bool
+        /// Optional for records written by older app versions. Unknown values remain readable.
+        public let detectionType: String?
 
-        public init(id: String, name: String, latitude: Double, longitude: Double, temperatureC: Double?, isFire: Bool) {
+        public init(id: String, name: String, latitude: Double, longitude: Double, temperatureC: Double?, isFire: Bool, detectionType: String? = nil) {
             self.id = id; self.name = name; self.latitude = latitude; self.longitude = longitude
-            self.temperatureC = temperatureC; self.isFire = isFire
+            self.temperatureC = temperatureC; self.isFire = isFire; self.detectionType = detectionType
         }
+
+        public var kind: String {
+            switch detectionType {
+            case let value? where ["fire", "smoke", "smokeAndFire", "heat"].contains(value): return value
+            default: return isFire ? "fire" : "heat"
+            }
+        }
+        public var isCritical: Bool { kind == "fire" || kind == "smoke" || kind == "smokeAndFire" }
     }
 
     public let id: String
@@ -51,5 +61,20 @@ public struct OfficerAssignment: Codable, Equatable, Identifiable, Sendable {
             && points.allSatisfy { !$0.id.isEmpty && $0.latitude.isFinite && (-90...90).contains($0.latitude)
                 && $0.longitude.isFinite && (-180...180).contains($0.longitude)
                 && ($0.temperatureC?.isFinite ?? true) }
+    }
+
+    /// Older clients drop detectionType when responding; all original fields still must match.
+    public func matchesLegacyResponse(_ response: OfficerAssignment) -> Bool {
+        guard id == response.id, workspaceID == response.workspaceID, recipientID == response.recipientID,
+              zoneID == response.zoneID, subzoneID == response.subzoneID, subzoneName == response.subzoneName,
+              scope == response.scope, sentAt == response.sentAt, deadline == response.deadline,
+              isSimulation == response.isSimulation, status == response.status,
+              respondedAt == response.respondedAt, rejectionReason == response.rejectionReason,
+              points.count == response.points.count else { return false }
+        return zip(points, response.points).allSatisfy { original, answer in
+            original.id == answer.id && original.name == answer.name && original.latitude == answer.latitude &&
+            original.longitude == answer.longitude && original.temperatureC == answer.temperatureC &&
+            original.isFire == answer.isFire && (answer.detectionType == nil || original.detectionType == answer.detectionType)
+        }
     }
 }
